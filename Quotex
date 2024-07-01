@@ -1,0 +1,63 @@
+import asyncio
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telethon.sync import TelegramClient
+
+# Telegram bot token
+BOT_TOKEN = '7144981982:AAETt3JKpSayj3nTe2dCqFmlOdp4kl_FgM8'
+
+# Telethon credentials
+API_ID = 29238075
+API_HASH = '467eafb86e39b78878937cabfdef6e5d'
+PHONE_NUMBER = '+918553168553'  # Your phone number with international format
+
+# Initialize Telethon client
+client = TelegramClient('session_name', API_ID, API_HASH)
+
+# Function to check trader information with Quotex Partner Bot
+async def check_trader_info(trader_id):
+    async with client:
+        await client.start(phone=PHONE_NUMBER)
+        bot_username = 'quotexpartnerbot'  # Replace with the actual username of the Quotex partner bot
+        await client.send_message(bot_username, trader_id)
+        response = await client.get_messages(bot_username, limit=1)
+        return response[0].message
+
+# Start command handler
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text('Welcome! Please send me your trader ID.')
+
+# Message handler for trader ID
+def handle_trader_id(update: Update, context: CallbackContext) -> None:
+    trader_id = update.message.text
+
+    # Check trader information asynchronously
+    async def verify_trader(trader_id):
+        return await check_trader_info(trader_id)
+
+    trader_info = asyncio.run(verify_trader(trader_id))
+    
+    # Parse `trader_info` based on the response format from the Quotex partner bot
+    if 'account_created' in trader_info and 'amount_deposited' in trader_info:
+        if trader_info['account_created'] and trader_info['amount_deposited'] >= 50:  # Replace 50 with your required deposit amount
+            update.message.reply_text('Verification successful! Here is your VIP link: [VIP Link]')
+        else:
+            update.message.reply_text('Verification failed. Please make sure you have created an account and deposited the required amount.')
+    else:
+        update.message.reply_text('Could not verify trader ID. Please try again later.')
+
+def main():
+    # Initialize the Telegram bot updater
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dispatcher = updater.dispatcher
+
+    # Add handlers for commands and messages
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_trader_id))
+
+    # Start the bot
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
